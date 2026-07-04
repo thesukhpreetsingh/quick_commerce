@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+.env
+.git
+.vscode
+dist
+coverage
+*.log
+/.DS_Store
+pnpm-lock.yaml
+docker-compose.override.yml

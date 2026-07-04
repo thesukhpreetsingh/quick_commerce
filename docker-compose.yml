@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: marketplace-db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: marketplace
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d marketplace"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: marketplace-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: postgres-db
+      DB_USER: user
+      DB_PASSWORD: password
+      DB_NAME: marketplace
+      DB_PORT: 5432
+      PORT: 5000
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    # For containerized runs use the image contents; remove the bind mount
+    # volumes:
+    #   - ./apps/backend:/app
+
+volumes:
+  postgres_data:

@@ -10,6 +10,7 @@ interface Product {
   price: number;
   thumbnail: string;
   description: string;
+  stock: number;
 }
 
 interface CartItem extends Product {
@@ -21,16 +22,36 @@ function App() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [view, setView] = useState<'products' | 'cart' | 'checkout'>('products');
   const [loading, setLoading] = useState(true);
+  const [currency, setCurrency] = useState<'USD' | 'INR'>('INR');
 
   useEffect(() => {
-    fetch('https://dummyjson.com/products')
+    fetch('http://localhost:5000/api/products')
       .then(res => res.json())
       .then(data => {
-        setProducts(data.products);
+        if (Array.isArray(data)) {
+          setProducts(data);
+        } else if (data && Array.isArray(data.products)) {
+          setProducts(data.products);
+        } else {
+          console.error('Unexpected API response format:', data);
+          setProducts([]);
+        }
         setLoading(false);
       })
-      .catch(err => console.error('Error fetching products:', err));
+      .catch(err => {
+        console.error('Error fetching products:', err);
+        setLoading(false);
+      });
   }, []);
+
+  const formatPrice = (price: any) => {
+    const numericPrice = typeof price === 'string' ? parseFloat(price) : price;
+    if (isNaN(numericPrice)) return '₹0.00';
+    
+    const converted = currency === 'INR' ? numericPrice * 96 : numericPrice;
+    const symbol = currency === 'INR' ? '₹' : '$';
+    return `${symbol}${converted.toFixed(2)}`;
+  };
 
   const addToCart = (product: Product) => {
     setCart(prevCart => {
@@ -46,11 +67,15 @@ function App() {
 
   const updateQuantity = (productId: number, delta: number) => {
     setCart(prevCart => 
-      prevCart.map(item => 
-        item.id === productId 
-          ? { ...item, quantity: Math.max(1, item.quantity + delta) } 
-          : item
-      )
+      prevCart.map(item => {
+        if (item.id === productId) {
+          const newQty = item.quantity + delta;
+          // Prevent going above stock or below 0
+          const clampedQty = Math.max(0, Math.min(newQty, item.stock));
+          return { ...item, quantity: clampedQty };
+        }
+        return item;
+      }).filter(item => item.quantity > 0)
     );
   };
 
@@ -69,7 +94,14 @@ function App() {
         <nav className="nav-buttons">
           <button onClick={() => setView('products')}>Products</button>
           <button onClick={() => setView('cart')} className="cart-btn">
-            Cart ({cart.length})
+            Cart ({cart.filter(item => item.quantity > 0).length})
+          </button>
+          <button 
+            onClick={() => setCurrency(prev => prev === 'INR' ? 'USD' : 'INR')}
+            title={`Switch to ${currency === 'INR' ? 'USD' : 'INR'}`}
+            style={{ fontWeight: 'bold', background: currency === 'INR' ? 'var(--primary-color)' : 'white' }}
+          >
+            {currency}
           </button>
         </nav>
       </header>
@@ -85,6 +117,7 @@ function App() {
                 quantity={cartItem?.quantity} 
                 onAdd={addToCart} 
                 onUpdateQuantity={updateQuantity} 
+                formatPrice={formatPrice}
               />
             );
           })}
@@ -117,14 +150,14 @@ function App() {
                           style={{ width: '25px', height: '25px', cursor: 'pointer', border: 'none', background: 'white', borderRadius: '2px' }}
                         >+</button>
                       </div>
-                      <span style={{ marginRight: '15px', fontWeight: 'bold', minWidth: '60px', textAlign: 'right' }}>${(item.price * item.quantity).toFixed(2)}</span>
+                      <span style={{ marginRight: '15px', fontWeight: 'bold', minWidth: '60px', textAlign: 'right' }}>{formatPrice(item.price * item.quantity)}</span>
                       <button onClick={() => removeFromCart(item.id)} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}>Remove</button>
                     </div>
                   </div>
                 ))}
               </div>
               <div style={{ textAlign: 'right', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '20px' }}>
-                Total: ${cartTotal.toFixed(2)}
+                Total: {formatPrice(cartTotal)}
               </div>
               <div style={{ textAlign: 'right' }}>
                 <button onClick={() => setView('products')} style={{ marginRight: '10px' }}>Continue Shopping</button>
@@ -152,7 +185,7 @@ function App() {
               <input type="text" placeholder="Zip Code" className="form-input" />
             </div>
             <div style={{ marginTop: '20px', textAlign: 'right' }}>
-              <p style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Total Amount: ${cartTotal.toFixed(2)}</p>
+              <p style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Total Amount: {formatPrice(cartTotal)}</p>
               <button 
                 onClick={() => { alert('Order placed successfully!'); setCart([]); setView('products'); }}
                 className="btn-success"

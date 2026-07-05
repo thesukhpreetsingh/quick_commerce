@@ -9,6 +9,11 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// Root route for verification
+app.get('/', (req, res) => {
+  res.send('Backend is running! API available at /api/products');
+});
+
 // Routes
 app.use('/api/products', productRoutes);
 

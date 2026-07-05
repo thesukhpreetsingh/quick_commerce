@@ -1,2 +1,4 @@
-packages: 
+packages:
   - 'apps/*' # as we are using monorepo
+allowBuilds:
+  msgpackr-extract: set this to true or false

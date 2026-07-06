@@ -1,4 +1,4 @@
-import { Worker, QueueScheduler, Job } from 'bullmq';
+import { Worker, JobScheduler, Job } from 'bullmq';
 import { queueName } from './orderQueue.js';
 import { query } from '../config/db.js';
 
@@ -7,7 +7,7 @@ const connection = {
   port: parseInt(process.env.REDIS_PORT || '6379', 10),
 };
 
-const scheduler = new QueueScheduler(queueName, { connection });
+const scheduler = new JobScheduler(queueName, { connection });
 
 scheduler.waitUntilReady().then(() => {
   console.log(`QueueScheduler for ${queueName} ready`);

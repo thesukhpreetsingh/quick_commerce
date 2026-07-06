@@ -13,7 +13,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "module",
   "dependencies": {
     "bullmq": "^5.79.2",
     "cors": "^2.8.6",
@@ -21,6 +20,7 @@
     "express": "^5.2.1",
     "pg": "^8.22.0",
     "redis": "^6.1.0",
+    "ulid": "^2.4.0",
     "uuid": "^14.0.1"
   },
   "devDependencies": {

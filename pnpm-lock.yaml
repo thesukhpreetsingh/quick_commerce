@@ -318,7 +318,36 @@ importers:
         specifier: ^8.1.1
         version: 8.1.3(@types/node@24.13.2)
 
-  apps/inventory-service: {}
+  apps/inventory-service:
+    dependencies:
+      cors:
+        specifier: ^2.8.6
+        version: 2.8.6
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
+      redis:
+        specifier: ^6.1.0
+        version: 6.1.0
+    devDependencies:
+      '@types/cors':
+        specifier: ^2.8.19
+        version: 2.8.19
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      ts-node:
+        specifier: ^10.9.2
+        version: 10.9.2(@types/node@24.13.2)(typescript@6.0.3)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
 
   apps/notification-service: {}
 
@@ -336,12 +365,34 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
+      pg:
+        specifier: ^8.22.0
+        version: 8.22.0
       redis:
         specifier: ^6.1.0
         version: 6.1.0
+      ulid:
+        specifier: ^2.4.0
+        version: 2.4.0
       uuid:
         specifier: ^14.0.1
         version: 14.0.1
+    devDependencies:
+      '@types/cors':
+        specifier: ^2.8.19
+        version: 2.8.19
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      '@types/uuid':
+        specifier: ^11.0.0
+        version: 11.0.0
+      ts-node:
+        specifier: ^10.9.2
+        version: 10.9.2(@types/node@24.13.2)(typescript@6.0.3)
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
 
 packages:
 
@@ -1710,6 +1761,10 @@ packages:
   typescript@6.0.3:
     resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
+    hasBin: true
+
+  ulid@2.4.0:
+    resolution: {integrity: sha512-fIRiVTJNcSRmXKPZtGzFQv9WRrZ3M9eoptl/teFJvjOzmpU+/K/JH6HZ8deBfb5vMEpicJcLn7JmvdknlMq7Zg==}
     hasBin: true
 
   undici-types@7.18.2:
@@ -3189,6 +3244,8 @@ snapshots:
       - supports-color
 
   typescript@6.0.3: {}
+
+  ulid@2.4.0: {}
 
   undici-types@7.18.2: {}
 

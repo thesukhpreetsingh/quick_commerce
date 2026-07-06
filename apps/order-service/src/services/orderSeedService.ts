@@ -3,11 +3,11 @@ import { query } from '../config/db.js';
 export async function seedOrderTables() {
   await query(`
     CREATE TABLE IF NOT EXISTS orders (
-      id UUID PRIMARY KEY,
+      id TEXT PRIMARY KEY,
       customer_name TEXT NOT NULL,
       address TEXT NOT NULL,
       total_amount NUMERIC NOT NULL,
-      status TEXT NOT NULL DEFAULT 'pending',
+      status TEXT NOT NULL DEFAULT 'PENDING_INVENTORY',
       idempotency_key TEXT UNIQUE,
       created_at TIMESTAMP NOT NULL,
       processed_at TIMESTAMP

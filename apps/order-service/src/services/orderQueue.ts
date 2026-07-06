@@ -1,7 +1,7 @@
 import { Queue } from 'bullmq';
 import { redisClient } from '../config/redis.js';
 
-const queueName = process.env.ORDER_QUEUE_NAME || 'order-queue';
+export const queueName = process.env.ORDER_QUEUE_NAME || 'order-queue';
 
 export const orderQueue = new Queue(queueName, {
   connection: {

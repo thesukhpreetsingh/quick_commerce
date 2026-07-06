@@ -28,6 +28,13 @@ function App() {
   const [orderMessage, setOrderMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    // Clear any previous order message when opening checkout
+    if (view === 'checkout') {
+      setOrderMessage(null);
+    }
+  }, [view]);
+
+  useEffect(() => {
     fetch('http://localhost:5000/api/products')
       .then(res => res.json())
       .then(data => {
@@ -231,7 +238,7 @@ function App() {
                   const idempotencyKey = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 
                   try {
-                    const response = await fetch('http://localhost:6000/api/orders', {
+                      const response = await fetch('http://localhost:6001/api/orders', {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json',
@@ -239,7 +246,7 @@ function App() {
                       body: JSON.stringify({
                         customerName: shipping.customerName,
                         address: `${shipping.address}, ${shipping.city}, ${shipping.zip}`,
-                        items: cart.map(item => ({ productId: item.id, quantity: item.quantity, price: item.price })),
+                        items: cart.map(item => ({ productId: (item as any).external_id ?? item.id, quantity: item.quantity, price: item.price })),
                         idempotencyKey,
                       }),
                     });
@@ -251,7 +258,8 @@ function App() {
 
                     setOrderMessage(`Order ${data.orderId} placed successfully!`);
                     setCart([]);
-                    setView('products');
+                    // keep user on the checkout view so they can see confirmation
+                    // they can continue shopping explicitly
                   } catch (err) {
                     console.error('Order error:', err);
                     alert('Could not place order. Please try again.');
@@ -265,6 +273,9 @@ function App() {
                 {placingOrder ? 'Placing Order...' : 'Place Order'}
               </button>
               <button onClick={() => setView('cart')} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}>Back to Cart</button>
+              {orderMessage && (
+                <button onClick={() => setView('products')} style={{ marginLeft: '10px' }} className="btn-primary">Continue Shopping</button>
+              )}
             </div>
           </div>
         </div>

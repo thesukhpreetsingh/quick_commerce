@@ -5,6 +5,7 @@ import { connectRedis } from './config/redis.js';
 import { seedOrderTables } from './services/orderSeedService.js';
 import orderRoutes from './routes/orderRoutes.js';
 import './services/orderQueue.js';
+import './services/orderWorker.js';
 
 dotenv.config();
 

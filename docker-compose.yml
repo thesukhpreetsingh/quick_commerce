@@ -23,6 +23,8 @@ services:
     restart: always
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
 
   backend:
     build:
@@ -50,6 +52,28 @@ services:
     # volumes:
     #   - ./apps/backend:/app
 
+  order-service:
+    build:
+      context: ./apps/order-service
+      dockerfile: Dockerfile
+    container_name: marketplace-order-service
+    restart: always
+    ports:
+      - "6000:6000"
+    environment:
+      DB_HOST: postgres-db
+      DB_USER: user
+      DB_PASSWORD: password
+      DB_NAME: marketplace
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   frontend:
     build:
       context: ./apps/frontend
@@ -60,7 +84,10 @@ services:
       - "8080:80"
     depends_on:
       - backend
+      - order-service
 
 volumes:
   postgres_data:
+  redis_data:
+  bullmq_data:
 

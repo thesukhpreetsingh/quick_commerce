@@ -23,6 +23,9 @@ function App() {
   const [view, setView] = useState<'products' | 'cart' | 'checkout'>('products');
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState<'USD' | 'INR'>('INR');
+  const [shipping, setShipping] = useState({ customerName: '', address: '', city: '', zip: '' });
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [orderMessage, setOrderMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('http://localhost:5000/api/products')
@@ -178,19 +181,88 @@ function App() {
           <h2>Checkout</h2>
           <div style={{ background: '#f9f9f9', padding: '20px', borderRadius: '8px', border: '1px solid #ddd' }}>
             <h3>Shipping Details</h3>
+            {orderMessage && (
+              <div style={{ marginBottom: '15px', color: 'green', fontWeight: 'bold' }}>{orderMessage}</div>
+            )}
             <div className="form-group">
-              <input type="text" placeholder="Full Name" className="form-input" />
-              <input type="text" placeholder="Address" className="form-input" />
-              <input type="text" placeholder="City" className="form-input" />
-              <input type="text" placeholder="Zip Code" className="form-input" />
+              <input
+                type="text"
+                placeholder="Full Name"
+                className="form-input"
+                value={shipping.customerName}
+                onChange={(e) => setShipping({ ...shipping, customerName: e.target.value })}
+              />
+              <input
+                type="text"
+                placeholder="Address"
+                className="form-input"
+                value={shipping.address}
+                onChange={(e) => setShipping({ ...shipping, address: e.target.value })}
+              />
+              <input
+                type="text"
+                placeholder="City"
+                className="form-input"
+                value={shipping.city}
+                onChange={(e) => setShipping({ ...shipping, city: e.target.value })}
+              />
+              <input
+                type="text"
+                placeholder="Zip Code"
+                className="form-input"
+                value={shipping.zip}
+                onChange={(e) => setShipping({ ...shipping, zip: e.target.value })}
+              />
             </div>
             <div style={{ marginTop: '20px', textAlign: 'right' }}>
               <p style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Total Amount: {formatPrice(cartTotal)}</p>
-              <button 
-                onClick={() => { alert('Order placed successfully!'); setCart([]); setView('products'); }}
+              <button
+                onClick={async () => {
+                  if (!shipping.customerName || !shipping.address) {
+                    alert('Please complete shipping details.');
+                    return;
+                  }
+                  if (cart.length === 0) {
+                    alert('Your cart is empty.');
+                    return;
+                  }
+
+                  setPlacingOrder(true);
+                  const idempotencyKey = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+
+                  try {
+                    const response = await fetch('http://localhost:6000/api/orders', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                      body: JSON.stringify({
+                        customerName: shipping.customerName,
+                        address: `${shipping.address}, ${shipping.city}, ${shipping.zip}`,
+                        items: cart.map(item => ({ productId: item.id, quantity: item.quantity, price: item.price })),
+                        idempotencyKey,
+                      }),
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) {
+                      throw new Error(data.error || 'Unable to place order');
+                    }
+
+                    setOrderMessage(`Order ${data.orderId} placed successfully!`);
+                    setCart([]);
+                    setView('products');
+                  } catch (err) {
+                    console.error('Order error:', err);
+                    alert('Could not place order. Please try again.');
+                  } finally {
+                    setPlacingOrder(false);
+                  }
+                }}
                 className="btn-success"
+                disabled={placingOrder}
               >
-                Place Order
+                {placingOrder ? 'Placing Order...' : 'Place Order'}
               </button>
               <button onClick={() => setView('cart')} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}>Back to Cart</button>
             </div>

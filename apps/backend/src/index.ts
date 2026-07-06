@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { seedDatabase } from './services/seedService';
+import { connectRedis } from './services/cacheService';
 import productRoutes from './routes/productRoutes';
 
 const app = express();
@@ -25,6 +26,9 @@ app.get('/health', (req, res) => {
 async function startServer() {
   try {
     console.log('Starting Backend Service...');
+    
+    // Connect to Redis
+    await connectRedis();
     
     // Run seeding logic on startup
     await seedDatabase();

@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package fairdeal.inventory;
+
+service InventoryService {
+  rpc ReserveInventory (ReserveInventoryRequest) returns (ReserveInventoryResponse);
+  rpc ReleaseReservation (ReservationActionRequest) returns (ReservationActionResponse);
+  rpc FinalizeReservation (ReservationActionRequest) returns (ReservationActionResponse);
+}
+
+message InventoryItem {
+  int32 productId = 1;
+  int32 quantity = 2;
+}
+
+message ReserveInventoryRequest {
+  string orderId = 1;
+  repeated InventoryItem items = 2;
+}
+
+message ReserveInventoryResponse {
+  bool success = 1;
+  string error = 2;
+  repeated InventoryItem reservedItems = 3;
+}
+
+message ReservationActionRequest {
+  string orderId = 1;
+}
+
+message ReservationActionResponse {
+  bool success = 1;
+  string error = 2;
+  repeated InventoryItem items = 3;
+}

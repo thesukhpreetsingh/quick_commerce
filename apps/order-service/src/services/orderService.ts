@@ -2,6 +2,7 @@ import { ulid } from 'ulid';
 import http from 'http';
 import https from 'https';
 import { dbPool, query } from '../config/db.js';
+import { redisClient } from '../config/redis.js';
 import { enqueueOrder } from './orderQueue.js';
 
 type OrderItem = {
@@ -13,14 +14,17 @@ type OrderItem = {
 type OrderPayload = {
   customerName: string;
   address: string;
+  phone: string;
+  email: string;
+  currency: string;
   items: OrderItem[];
   idempotencyKey?: string;
 };
 
-async function reserveInventory(items: OrderItem[]) {
+async function reserveInventory(orderId: string, items: OrderItem[]) {
   const inventoryUrl = process.env.INVENTORY_SERVICE_URL || 'http://inventory-service:7000';
   const url = new URL('/api/inventory/reserve', inventoryUrl);
-  const body = JSON.stringify({ items });
+  const body = JSON.stringify({ orderId, items });
   const client = url.protocol === 'https:' ? https : http;
 
   return new Promise<void>((resolve, reject) => {
@@ -63,8 +67,8 @@ async function persistOrder(orderId: string, orderData: OrderPayload, totalAmoun
     await client.query('BEGIN');
 
     const orderResult = await client.query(
-      'INSERT INTO orders (id, customer_name, address, total_amount, status, idempotency_key, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [orderId, orderData.customerName, orderData.address, totalAmount, 'PENDING_INVENTORY', orderData.idempotencyKey || null, createdAt]
+      'INSERT INTO orders (id, customer_name, address, phone, email, total_amount, currency, status, idempotency_key, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [orderId, orderData.customerName, orderData.address, orderData.phone, orderData.email, totalAmount, orderData.currency, 'PENDING_INVENTORY', orderData.idempotencyKey || null, createdAt]
     );
 
     for (const item of orderData.items) {
@@ -89,10 +93,21 @@ async function updateOrderStatus(orderId: string, status: string) {
 }
 
 export async function createOrder(orderData: OrderPayload) {
-  if (orderData.idempotencyKey) {
-    const existing = await query('SELECT * FROM orders WHERE idempotency_key = $1', [orderData.idempotencyKey]);
-    if (existing.rows.length > 0) {
-      return existing.rows[0];
+  const idempotencyKey = orderData.idempotencyKey?.trim();
+
+  if (idempotencyKey) {
+    const cachedOrderId = await redisClient.get(`idempotency:${idempotencyKey}`);
+    if (cachedOrderId) {
+      const existing = await query('SELECT * FROM orders WHERE id = $1', [cachedOrderId]);
+      if (existing.rows.length > 0) {
+        return existing.rows[0];
+      }
+    }
+
+    const existingByKey = await query('SELECT * FROM orders WHERE idempotency_key = $1', [idempotencyKey]);
+    if (existingByKey.rows.length > 0) {
+      await redisClient.set(`idempotency:${idempotencyKey}`, existingByKey.rows[0].id);
+      return existingByKey.rows[0];
     }
   }
 
@@ -103,11 +118,15 @@ export async function createOrder(orderData: OrderPayload) {
   const orderRecord = await persistOrder(orderId, orderData, totalAmount, createdAt);
 
   try {
-    await reserveInventory(orderData.items);
+    await reserveInventory(orderId, orderData.items);
     await updateOrderStatus(orderId, 'INVENTORY_RESERVED');
   } catch (error) {
     await updateOrderStatus(orderId, 'INVENTORY_FAILED');
     throw error;
+  }
+
+  if (idempotencyKey) {
+    await redisClient.set(`idempotency:${idempotencyKey}`, orderId);
   }
 
   await enqueueOrder({ id: orderId, ...orderData, totalAmount, createdAt: createdAt.toISOString() });

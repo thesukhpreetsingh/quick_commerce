@@ -1,6 +1,8 @@
 import { Worker, JobScheduler, Job } from 'bullmq';
 import { queueName } from './orderQueue.js';
 import { query } from '../config/db.js';
+import http from 'http';
+import https from 'https';
 
 const connection = {
   host: process.env.REDIS_HOST || 'localhost',
@@ -10,9 +12,9 @@ const connection = {
 const scheduler = new JobScheduler(queueName, { connection });
 
 scheduler.waitUntilReady().then(() => {
-  console.log(`QueueScheduler for ${queueName} ready`);
+  console.log(`JobScheduler for ${queueName} ready`);
 }).catch((error) => {
-  console.error('QueueScheduler failed to start:', error);
+  console.error('JobScheduler failed to start:', error);
 });
 
 const worker = new Worker(
@@ -27,13 +29,16 @@ const worker = new Worker(
 
     await query('UPDATE orders SET status = $1 WHERE id = $2', ['PROCESSING', data.id]);
 
-    // Here you can call a payment service or other downstream services.
-    // For now, we simulate work and mark the order as ready for payment.
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
+    // mark the order ready for payment and schedule a timeout
     await query('UPDATE orders SET status = $1 WHERE id = $2', ['PAYMENT_PENDING', data.id]);
+    try {
+      const { schedulePaymentTimeout } = await import('./orderQueue.js');
+      await schedulePaymentTimeout(data.id, 60_000);
+    } catch (err) {
+      console.error('Failed to schedule payment timeout', err);
+    }
 
-    console.log(`Job ${job.id} completed for order ${data.id}`);
+    console.log(`Job ${job.id} completed for order ${data.id} (now PAYMENT_PENDING)`);
     return { success: true };
   },
   { connection }

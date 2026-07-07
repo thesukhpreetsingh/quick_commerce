@@ -68,9 +68,26 @@ services:
       DB_PORT: 5432
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      INVENTORY_SERVICE_GRPC_URL: inventory-service:7001
     depends_on:
       postgres-db:
         condition: service_healthy
+      redis:
+        condition: service_started
+
+  payment-service:
+    build:
+      context: ./apps/payment-service
+      dockerfile: Dockerfile
+    container_name: marketplace-payment-service
+    restart: always
+    ports:
+      - "5002:5000"
+    environment:
+      PORT: 5000
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
       redis:
         condition: service_started
 

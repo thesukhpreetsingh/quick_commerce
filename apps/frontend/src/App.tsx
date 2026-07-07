@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react'
+import { ulid } from 'ulid'
 import './App.css'
 import { ProductCard } from './components/ProductCard'
+
+const ORDER_SERVICE_URL = import.meta.env.VITE_ORDER_SERVICE_URL || 'http://localhost:6001'
+const PRODUCT_SERVICE_URL = import.meta.env.VITE_PRODUCT_SERVICE_URL || 'http://localhost:5000'
+const PAYMENT_SERVICE_URL = import.meta.env.VITE_PAYMENT_SERVICE_URL || 'http://localhost:5002'
 
 interface Product {
 // ...existing code...
@@ -20,12 +25,20 @@ interface CartItem extends Product {
 function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [view, setView] = useState<'products' | 'cart' | 'checkout'>('products');
+  const [view, setView] = useState<'products' | 'cart' | 'checkout' | 'payment' | 'success'>('products');
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState<'USD' | 'INR'>('INR');
   const [shipping, setShipping] = useState({ customerName: '', address: '', city: '', zip: '' });
+  // add phone and email
+  const [contact, setContact] = useState({ phone: '', email: '' });
   const [placingOrder, setPlacingOrder] = useState(false);
   const [orderMessage, setOrderMessage] = useState<string | null>(null);
+  const [paymentOrderId, setPaymentOrderId] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState<number | null>(null);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [paymentTimeLeft, setPaymentTimeLeft] = useState(60);
+  const [orderServiceUp, setOrderServiceUp] = useState(true);
+  const [healthLoading, setHealthLoading] = useState(true);
 
   useEffect(() => {
     // Clear any previous order message when opening checkout
@@ -35,7 +48,41 @@ function App() {
   }, [view]);
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/products')
+    if (view !== 'payment') {
+      return;
+    }
+
+    setPaymentTimeLeft(60);
+    const timer = setInterval(() => {
+      setPaymentTimeLeft((current) => {
+        if (current <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [view, paymentOrderId]);
+
+  useEffect(() => {
+    async function fetchHealth() {
+      try {
+        const response = await fetch(`${ORDER_SERVICE_URL}/health`);
+        setOrderServiceUp(response.ok);
+      } catch (err) {
+        setOrderServiceUp(false);
+      } finally {
+        setHealthLoading(false);
+      }
+    }
+
+    fetchHealth();
+  }, []);
+
+  useEffect(() => {
+    fetch(`${PRODUCT_SERVICE_URL}/api/products`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -106,6 +153,12 @@ function App() {
           <button onClick={() => setView('cart')} className="cart-btn">
             Cart ({cart.filter(item => item.quantity > 0).length})
           </button>
+          <button
+            onClick={() => window.open(`${ORDER_SERVICE_URL}/api/docs`, '_blank', 'noopener')}
+            title="Open API documentation"
+          >
+            Docs
+          </button>
           <button 
             onClick={() => setCurrency(prev => prev === 'INR' ? 'USD' : 'INR')}
             title={`Switch to ${currency === 'INR' ? 'USD' : 'INR'}`}
@@ -174,6 +227,8 @@ function App() {
                 <button 
                   onClick={() => setView('checkout')} 
                   className="btn-primary"
+                  disabled={!orderServiceUp || healthLoading}
+                  title={!orderServiceUp ? 'Checkout unavailable while order service is unhealthy' : ''}
                 >
                   Proceed to Checkout
                 </button>
@@ -208,6 +263,20 @@ function App() {
               />
               <input
                 type="text"
+                placeholder="Phone"
+                className="form-input"
+                value={contact.phone}
+                onChange={(e) => setContact({ ...contact, phone: e.target.value })}
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                className="form-input"
+                value={contact.email}
+                onChange={(e) => setContact({ ...contact, email: e.target.value })}
+              />
+              <input
+                type="text"
                 placeholder="City"
                 className="form-input"
                 value={shipping.city}
@@ -223,60 +292,160 @@ function App() {
             </div>
             <div style={{ marginTop: '20px', textAlign: 'right' }}>
               <p style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>Total Amount: {formatPrice(cartTotal)}</p>
-              <button
-                onClick={async () => {
-                  if (!shipping.customerName || !shipping.address) {
-                    alert('Please complete shipping details.');
-                    return;
-                  }
-                  if (cart.length === 0) {
-                    alert('Your cart is empty.');
-                    return;
-                  }
-
-                  setPlacingOrder(true);
-                  const idempotencyKey = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-
-                  try {
-                      const response = await fetch('http://localhost:6001/api/orders', {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                      body: JSON.stringify({
-                        customerName: shipping.customerName,
-                        address: `${shipping.address}, ${shipping.city}, ${shipping.zip}`,
-                        items: cart.map(item => ({ productId: (item as any).external_id ?? item.id, quantity: item.quantity, price: item.price })),
-                        idempotencyKey,
-                      }),
-                    });
-
-                    const data = await response.json();
-                    if (!response.ok) {
-                      throw new Error(data.error || 'Unable to place order');
+              {!orderMessage && (
+                <button
+                  onClick={async () => {
+                    if (!shipping.customerName || !shipping.address) {
+                      alert('Please complete shipping details.');
+                      return;
+                    }
+                    if (!contact.phone || !contact.email) {
+                      alert('Phone and email are required.');
+                      return;
+                    }
+                    if (cart.length === 0) {
+                      alert('Your cart is empty.');
+                      return;
                     }
 
-                    setOrderMessage(`Order ${data.orderId} placed successfully!`);
-                    setCart([]);
-                    // keep user on the checkout view so they can see confirmation
-                    // they can continue shopping explicitly
-                  } catch (err) {
-                    console.error('Order error:', err);
-                    alert('Could not place order. Please try again.');
-                  } finally {
-                    setPlacingOrder(false);
-                  }
-                }}
-                className="btn-success"
-                disabled={placingOrder}
-              >
-                {placingOrder ? 'Placing Order...' : 'Place Order'}
-              </button>
-              <button onClick={() => setView('cart')} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}>Back to Cart</button>
+                    if (!orderServiceUp) {
+                      alert('Checkout is unavailable right now. Please try again later.');
+                      return;
+                    }
+
+                    setPlacingOrder(true);
+                    const idempotencyKey = ulid();
+
+                    try {
+                      const response = await fetch(`${ORDER_SERVICE_URL}/api/orders`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                          customerName: shipping.customerName,
+                          address: `${shipping.address}, ${shipping.city}, ${shipping.zip}`,
+                          phone: contact.phone,
+                          email: contact.email,
+                          currency: currency,
+                          items: cart.map(item => ({ productId: (item as any).external_id ?? item.id, quantity: item.quantity, price: item.price })),
+                          idempotencyKey,
+                        }),
+                      });
+
+                      const data = await response.json();
+                      if (!response.ok) {
+                        throw new Error(data.error || 'Unable to place order');
+                      }
+
+                      // redirect to mock payment screen where user completes payment
+                      setPaymentOrderId(data.orderId);
+                      setPaymentAmount(cartTotal);
+                      setView('payment');
+                    } catch (err) {
+                      console.error('Order error:', err);
+                      alert('Could not place order. Please try again.');
+                    } finally {
+                      setPlacingOrder(false);
+                    }
+                  }}
+                  className="btn-success"
+                  disabled={placingOrder}
+                >
+                  {placingOrder ? 'Placing Order...' : 'Place Order'}
+                </button>
+              )}
+              {!orderMessage && (
+                <button onClick={() => setView('cart')} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', color: '#666' }}>Back to Cart</button>
+              )}
+              {(!orderServiceUp && !healthLoading) && (
+                <div style={{ marginTop: '15px', color: 'red', fontWeight: 'bold' }}>
+                  Order service is currently unavailable. Checkout is disabled until Redis/inventory health is restored.
+                </div>
+              )}
               {orderMessage && (
                 <button onClick={() => setView('products')} style={{ marginLeft: '10px' }} className="btn-primary">Continue Shopping</button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {view === 'payment' && (
+        <div style={{ padding: 20 }}>
+          <h2>Mock Payment Provider</h2>
+          <div style={{ border: '1px solid #ddd', padding: 20, borderRadius: 8, maxWidth: 480 }}>
+            <p>Order: <strong>{paymentOrderId}</strong></p>
+            <p>Amount: <strong>{formatPrice(paymentAmount || 0)}</strong></p>
+            <p style={{ marginTop: 8, fontStyle: 'italic' }}>Testing rule: payments greater than <strong>5000</strong> will be declined.</p>
+            <p style={{ marginTop: 8, color: '#333', fontWeight: 600 }}>
+              You have <strong>60 seconds</strong> to complete payment. After the timer expires, the order will be marked failed and inventory will be released.
+            </p>
+            <div style={{ marginTop: 8, marginBottom: 15, fontSize: '1.1rem', fontWeight: 'bold' }}>
+              Time remaining: <span style={{ color: paymentTimeLeft <= 10 ? 'red' : '#0070f3' }}>{paymentTimeLeft}s</span>
+            </div>
+            {paymentAmount != null && (
+              <p style={{ marginTop: 8, color: paymentAmount > 5000 ? 'red' : 'green', fontWeight: 'bold' }}>
+                {paymentAmount > 5000 ? 'This payment will be DECLINED (amount &gt; 5000).' : 'This payment will SUCCEED (amount ≤ 5000).'}
+              </p>
+            )}
+            <p>Please click "Done Payment" to simulate returning from a payment gateway.</p>
+            <div style={{ marginTop: 20 }}>
+              <button
+                onClick={async () => {
+                  if (!paymentOrderId || paymentAmount == null) return;
+                  setPaymentProcessing(true);
+                  try {
+                    const resp = await fetch(`${PAYMENT_SERVICE_URL}/api/payments`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ 
+                        orderId: paymentOrderId, 
+                        amount: currency === 'INR' ? paymentAmount * 96 : paymentAmount, 
+                        currency: currency,
+                        customerName: shipping.customerName, 
+                        address: shipping.address, 
+                        phone: contact.phone, 
+                        email: contact.email 
+                      })
+                    });
+                    const data = await resp.json();
+                    if (!resp.ok) {
+                      alert(`Payment failed: ${data.error || resp.statusText}`);
+                      setView('checkout');
+                      return;
+                    }
+
+                    // show a short loader then show success screen
+                    await new Promise(r => setTimeout(r, 800));
+                    setCart([]);
+                    setPaymentProcessing(false);
+                    setView('success');
+                  } catch (err) {
+                    console.error('Payment error', err);
+                    alert('Payment request failed');
+                    setView('checkout');
+                  } finally {
+                    setPaymentProcessing(false);
+                  }
+                }}
+                disabled={paymentProcessing}
+                className="btn-success"
+              >
+                {paymentProcessing ? 'Processing...' : 'Done Payment'}
+              </button>
+              <button onClick={() => setView('checkout')} style={{ marginLeft: 10 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {view === 'success' && (
+        <div style={{ padding: 20 }}>
+          <h2>Payment Successful</h2>
+          <p style={{ fontWeight: 'bold' }}>Your payment was successful. Thank you for your order.</p>
+          <div style={{ marginTop: 20 }}>
+            <button onClick={() => { setView('products'); setOrderMessage(null); }} className="btn-primary">Continue Shopping</button>
           </div>
         </div>
       )}

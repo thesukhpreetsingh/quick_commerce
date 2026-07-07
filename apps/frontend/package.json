@@ -12,6 +12,7 @@
   "dependencies": {
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
+    ,"ulid": "^2.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

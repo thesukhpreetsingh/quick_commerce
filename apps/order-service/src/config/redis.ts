@@ -18,3 +18,10 @@ export async function connectRedis() {
     console.log('Order service connected to Redis');
   }
 }
+
+export async function pingRedis() {
+  if (!redisClient.isOpen) {
+    await redisClient.connect();
+  }
+  return await redisClient.ping();
+}

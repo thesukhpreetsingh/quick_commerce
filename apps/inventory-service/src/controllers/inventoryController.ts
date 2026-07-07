@@ -1,8 +1,17 @@
 import { Request, Response } from 'express';
-import { getInventory, decreaseInventory } from '../services/inventoryService.js';
+import { getInventory, decreaseInventory, reserveInventory, releaseInventory, finalizeReservation } from '../services/inventoryService.js';
 
 type InventoryRequest = {
   items: Array<{ productId: number; quantity: number }>;
+};
+
+type ReservationRequest = {
+  orderId: string;
+  items: Array<{ productId: number; quantity: number }>;
+};
+
+type ReservationActionRequest = {
+  orderId: string;
 };
 
 export const fetchInventory = async (req: Request, res: Response) => {
@@ -37,13 +46,13 @@ export const decreaseInventoryHandler = async (req: Request<{}, {}, InventoryReq
   }
 };
 
-export const reserveInventoryHandler = async (req: Request<{}, {}, InventoryRequest>, res: Response) => {
+export const reserveInventoryHandler = async (req: Request<{}, {}, ReservationRequest>, res: Response) => {
   try {
-    const items = req.body.items;
-    if (!Array.isArray(items)) {
-      return res.status(400).json({ error: 'items array is required' });
+    const { orderId, items } = req.body;
+    if (!orderId || !Array.isArray(items)) {
+      return res.status(400).json({ error: 'orderId and items array are required' });
     }
-    const reserved = await decreaseInventory(items.map((item) => ({
+    const reserved = await reserveInventory(orderId, items.map((item) => ({
       productId: item.productId,
       quantity: item.quantity
     })));
@@ -52,6 +61,32 @@ export const reserveInventoryHandler = async (req: Request<{}, {}, InventoryRequ
     if (error.message.includes('Insufficient stock') || error.message.includes('not found')) {
       return res.status(400).json({ error: error.message });
     }
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+};
+
+export const releaseInventoryHandler = async (req: Request<{}, {}, ReservationActionRequest>, res: Response) => {
+  try {
+    const { orderId } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ error: 'orderId is required' });
+    }
+    const result = await releaseInventory(orderId);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+};
+
+export const finalizeInventoryHandler = async (req: Request<{}, {}, ReservationActionRequest>, res: Response) => {
+  try {
+    const { orderId } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ error: 'orderId is required' });
+    }
+    const result = await finalizeReservation(orderId);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };

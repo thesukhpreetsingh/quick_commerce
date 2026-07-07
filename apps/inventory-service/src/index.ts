@@ -1,8 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { connectRedis } from './config/redis.js';
+import swaggerUi from 'swagger-ui-express';
+import { connectRedis, pingRedis } from './config/redis.js';
+import { dbPool } from './config/db.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
+import { logger, requestLogger, errorLogger } from './config/logger.js';
+import { swaggerSpec } from './config/swagger.js';
 
 dotenv.config();
 
@@ -11,25 +15,49 @@ const PORT = process.env.PORT || 7000;
 
 app.use(cors());
 app.use(express.json());
+app.use(requestLogger);
 
 app.get('/', (req, res) => {
   res.send('Inventory service is running');
 });
 
-app.use('/api/inventory', inventoryRoutes);
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'UP', timestamp: new Date().toISOString() });
+app.get('/health', async (req, res) => {
+  const health: any = { redis: 'DOWN', db: 'DOWN' };
+  let overallUp = true;
+
+  try {
+    await pingRedis();
+    health.redis = 'UP';
+  } catch (error: any) {
+    overallUp = false;
+    health.redis = 'DOWN';
+  }
+
+  try {
+    await dbPool.query('SELECT 1');
+    health.db = 'UP';
+  } catch (error: any) {
+    overallUp = false;
+    health.db = 'DOWN';
+  }
+
+  res.status(overallUp ? 200 : 503).json({ status: overallUp ? 'UP' : 'DOWN', ...health, timestamp: new Date().toISOString() });
 });
+
+app.use('/api/inventory', inventoryRoutes);
 
 async function start() {
   await connectRedis();
   app.listen(PORT, () => {
-    console.log(`Inventory service listening on http://localhost:${PORT}`);
+    logger.info(`Inventory service listening on http://localhost:${PORT}`);
   });
 }
 
-start().catch((error) => {
-  console.error('Inventory service failed to start', error);
+app.use(errorLogger);
+
+start().catch((error: any) => {
+  logger.error('Inventory service failed to start', { error: error.message || error });
   process.exit(1);
 });

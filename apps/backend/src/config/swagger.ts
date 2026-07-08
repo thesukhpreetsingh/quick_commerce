@@ -13,5 +13,10 @@ export const swaggerSpec = swaggerJsdoc({
     },
     servers: [{ url: '/' }],
   },
-  apis: [path.join(rootDir, 'routes/*.ts'), path.join(rootDir, 'routes/*.js')],
+  apis: [
+    path.join(rootDir, 'routes/*.ts'),
+    path.join(rootDir, 'routes/*.js'),
+    path.join(rootDir, 'controllers/*.ts'),
+    path.join(rootDir, 'controllers/*.js'),
+  ],
 });

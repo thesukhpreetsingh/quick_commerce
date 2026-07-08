@@ -1,6 +1,6 @@
 import { Worker, JobScheduler } from 'bullmq';
 import { query } from '../config/db.js';
-import { releaseInventoryReservation } from './inventoryClient.js';
+import { releaseInventoryReservation } from './inventoryGrpcClient.js';
 const connection = {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),

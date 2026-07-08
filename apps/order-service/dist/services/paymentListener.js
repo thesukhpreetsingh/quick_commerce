@@ -1,9 +1,10 @@
 import { Worker, JobScheduler } from 'bullmq';
 import { query } from '../config/db.js';
 import { timeoutQueue } from './orderQueue.js';
-import { finalizeInventoryReservation, releaseInventoryReservation } from './inventoryClient.js';
+import { finalizeInventoryReservation, releaseInventoryReservation } from './inventoryGrpcClient.js';
 import { enqueueNotification } from './notificationQueue.js';
 import { shouldAcceptPaymentResult } from './paymentStateGuard.js';
+import { redisClient } from '../config/redis.js';
 const connection = {
     host: process.env.REDIS_HOST || 'redis',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),
@@ -23,7 +24,14 @@ const worker = new Worker(paymentQueueName, async (job) => {
     if (data.success) {
         await query('UPDATE orders SET status = $1, transaction_id = $2, processed_at = NOW() WHERE id = $3', ['PAID', data.transactionId || null, data.orderId]);
         await finalizeInventoryReservation(data.orderId);
-        console.log(`Order ${data.orderId} marked PAID`);
+        const orderItems = await query('SELECT product_id FROM order_items WHERE order_id = $1', [data.orderId]);
+        for (const item of orderItems.rows) {
+            const productId = item.product_id;
+            await redisClient.del(`product:${productId}`);
+            await redisClient.del(`inventory:product:${productId}`);
+        }
+        await redisClient.del('all_products');
+        console.log(`Order ${data.orderId} marked PAID and affected product caches invalidated`);
         // Notify Payment Success
         const order = await query('SELECT phone FROM orders WHERE id = $1', [data.orderId]);
         if (order.rows[0]) {

@@ -1,10 +1,10 @@
 import { ulid } from 'ulid';
-import http from 'http';
-import https from 'https';
 import { dbPool, query } from '../config/db.js';
 import { redisClient } from '../config/redis.js';
 import { enqueueOrder } from './orderQueue.js';
 import { enqueueNotification } from './notificationQueue.js';
+import { reserveInventory as reserveInventoryGrpc } from './inventoryGrpcClient.js';
+// import { reserveInventory as reserveInventoryGrpc } from './inventoryGrpcClient.js';
 
 type OrderItem = {
   productId: number;
@@ -23,43 +23,7 @@ type OrderPayload = {
 };
 
 async function reserveInventory(orderId: string, items: OrderItem[]) {
-  const inventoryUrl = process.env.INVENTORY_SERVICE_URL || 'http://inventory-service:7000';
-  const url = new URL('/api/inventory/reserve', inventoryUrl);
-  const body = JSON.stringify({ orderId, items });
-  const client = url.protocol === 'https:' ? https : http;
-
-  return new Promise<void>((resolve, reject) => {
-    const request = client.request(
-      {
-        method: 'POST',
-        hostname: url.hostname,
-        port: url.port,
-        path: url.pathname,
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-        },
-      },
-      (res) => {
-        let data = '';
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-        res.on('end', () => {
-          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-            return resolve();
-          }
-
-          const message = data || res.statusMessage;
-          return reject(new Error(`Inventory reservation failed (${res.statusCode}): ${message}`));
-        });
-      }
-    );
-
-    request.on('error', reject);
-    request.write(body);
-    request.end();
-  });
+  await reserveInventoryGrpc(orderId, items.map((item) => ({ productId: item.productId, quantity: item.quantity })));
 }
 
 async function persistOrder(orderId: string, orderData: OrderPayload, totalAmount: number, createdAt: Date) {

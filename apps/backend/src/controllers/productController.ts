@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { query } from '../config/db';
-import { getCache, setCache } from '../services/cacheService';
+import { query } from '../config/db.js';
+import { getCache, setCache } from '../services/cacheService.js';
 
 export const getProducts = async (req: Request, res: Response) => {
   try {

@@ -1,19 +1,16 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Install pnpm globally for order-service dependency installation
-RUN npm install -g pnpm
+COPY apps/order-service/package.json ./apps/order-service/package.json
+COPY apps/order-service/tsconfig.json ./apps/order-service/tsconfig.json
+COPY apps/protos ./apps/protos
 
-COPY package.json ./
-COPY tsconfig.json ./
+RUN cd /app/apps/order-service && npm install --no-audit --progress=false --legacy-peer-deps
 
-RUN pnpm install
+COPY apps/order-service ./apps/order-service
 
-COPY . ./
-
-RUN pnpm run build
+RUN cd /app/apps/order-service && npm run build
 
 EXPOSE 6000
-
-CMD ["node", "dist/index.js"]
+CMD ["node", "/app/apps/order-service/dist/index.js"]

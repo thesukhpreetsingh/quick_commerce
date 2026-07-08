@@ -1,7 +1,7 @@
 import { Worker, JobScheduler, Job } from 'bullmq';
 import { query } from '../config/db.js';
 import { timeoutQueue } from './orderQueue.js';
-import { finalizeInventoryReservation, releaseInventoryReservation } from './inventoryClient.js';
+import { finalizeInventoryReservation, releaseInventoryReservation } from './inventoryGrpcClient.js';
 import { enqueueNotification } from './notificationQueue.js';
 import { shouldAcceptPaymentResult } from './paymentStateGuard.js';
 import { redisClient } from '../config/redis.js';

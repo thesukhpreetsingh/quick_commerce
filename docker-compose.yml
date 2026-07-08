@@ -54,21 +54,22 @@ services:
 
   order-service:
     build:
-      context: ./apps/order-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./apps/order-service/Dockerfile
     container_name: marketplace-order-service
     restart: always
     ports:
       - "6001:6000"
-    # environment:
-    #   DB_HOST: postgres-db
-    #   DB_USER: user
-    #   DB_PASSWORD: password
-    #   DB_NAME: marketplace
-    #   DB_PORT: 5432
-    #   REDIS_HOST: redis
-    #   REDIS_PORT: 6379
-    #   INVENTORY_SERVICE_GRPC_URL: inventory-service:7001
+    environment:
+      DB_HOST: postgres-db
+      DB_USER: user
+      DB_PASSWORD: password
+      DB_NAME: marketplace
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      INVENTORY_SERVICE_GRPC_URL: inventory-service:7001
+      INVENTORY_GRPC_URL: inventory-service:7001
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -93,12 +94,13 @@ services:
 
   inventory-service:
     build:
-      context: ./apps/inventory-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./apps/inventory-service/Dockerfile
     container_name: marketplace-inventory-service
     restart: always
     ports:
       - "7000:7000"
+      - "7001:7001"
     environment:
       DB_HOST: postgres-db
       DB_USER: user

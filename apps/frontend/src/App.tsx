@@ -34,7 +34,8 @@ function App() {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [view, setView] = useState<'products' | 'cart' | 'checkout' | 'payment' | 'success'>('products');
-  const [loading, setLoading] = useState(true);
+
+  
   const [currency, setCurrency] = useState<'USD' | 'INR'>('INR');
   const [shipping, setShipping] = useState({ customerName: '', address: '', city: '', zip: '' });
   // add phone and email
@@ -45,6 +46,8 @@ function App() {
   const [paymentAmount, setPaymentAmount] = useState<number | null>(null);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentTimeLeft, setPaymentTimeLeft] = useState(60);
+  const [paymentExpired, setPaymentExpired] = useState(false);
+  const [redirectSeconds, setRedirectSeconds] = useState(10);
   const [orderServiceUp, setOrderServiceUp] = useState(true);
   const [healthLoading, setHealthLoading] = useState(true);
   const [showDocsMenu, setShowDocsMenu] = useState(false);
@@ -62,6 +65,9 @@ function App() {
     }
 
     setPaymentTimeLeft(60);
+    setPaymentExpired(false);
+    setRedirectSeconds(10);
+
     const timer = setInterval(() => {
       setPaymentTimeLeft((current) => {
         if (current <= 1) {
@@ -74,6 +80,40 @@ function App() {
 
     return () => clearInterval(timer);
   }, [view, paymentOrderId]);
+
+  useEffect(() => {
+    if (view !== 'payment') {
+      return;
+    }
+
+    if (paymentTimeLeft > 0) {
+      setPaymentExpired(false);
+      return;
+    }
+
+    setPaymentExpired(true);
+  }, [view, paymentTimeLeft]);
+
+  useEffect(() => {
+    if (!paymentExpired || view !== 'payment') {
+      return;
+    }
+
+    if (redirectSeconds <= 0) {
+      setView('products');
+      setPaymentOrderId(null);
+      setPaymentAmount(null);
+      setPaymentExpired(false);
+      setRedirectSeconds(10);
+      return;
+    }
+
+    const redirectTimer = window.setTimeout(() => {
+      setRedirectSeconds((current) => current - 1);
+    }, 1000);
+
+    return () => window.clearTimeout(redirectTimer);
+  }, [paymentExpired, redirectSeconds, view]);
 
   useEffect(() => {
     async function fetchHealth() {
@@ -90,24 +130,24 @@ function App() {
     fetchHealth();
   }, []);
 
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch(`${PRODUCT_SERVICE_URL}/api/products`, {
+      cache: 'no-store', // always hit the network, never serve a stale cached response
+    });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setProducts(data);
+      } else if (data && Array.isArray(data.products)) {
+        setProducts(data.products);
+      }
+    } catch (err) {
+      console.error('Failed to fetch products:', err);
+    }
+  };
+
   useEffect(() => {
-    fetch(`${PRODUCT_SERVICE_URL}/api/products`)
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setProducts(data);
-        } else if (data && Array.isArray(data.products)) {
-          setProducts(data.products);
-        } else {
-          console.error('Unexpected API response format:', data);
-          setProducts([]);
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error('Error fetching products:', err);
-        setLoading(false);
-      });
+    fetchProducts();
   }, []);
 
   const formatPrice = (price: any) => {
@@ -151,7 +191,7 @@ function App() {
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  if (loading) return <div style={{ padding: '20px', textAlign: 'center' }}>Loading products...</div>;
+  // if (loading) return <div style={{ padding: '20px', textAlign: 'center' }}>Loading products...</div>;
 
   return (
     <div className="app-container">
@@ -418,9 +458,14 @@ function App() {
             )}
             <p>Please click "Done Payment" to simulate returning from a payment gateway.</p>
             <div style={{ marginTop: 20 }}>
+              {paymentExpired && (
+                <div style={{ marginBottom: 16, color: 'red', fontWeight: 'bold' }}>
+                  Payment time expired. Redirecting back to products in {redirectSeconds} second{redirectSeconds === 1 ? '' : 's'}...
+                </div>
+              )}
               <button
                 onClick={async () => {
-                  if (!paymentOrderId || paymentAmount == null) return;
+                  if (!paymentOrderId || paymentAmount == null || paymentExpired) return;
                   setPaymentProcessing(true);
                   try {
                     const resp = await fetch(`${PAYMENT_SERVICE_URL}/api/payments`, {
@@ -446,6 +491,7 @@ function App() {
                     // show a short loader then show success screen
                     await new Promise(r => setTimeout(r, 800));
                     setCart([]);
+                    await fetchProducts();
                     setPaymentProcessing(false);
                     setView('success');
                   } catch (err) {
@@ -456,12 +502,12 @@ function App() {
                     setPaymentProcessing(false);
                   }
                 }}
-                disabled={paymentProcessing}
+                disabled={paymentProcessing || paymentExpired || paymentTimeLeft <= 0}
                 className="btn-success"
               >
                 {paymentProcessing ? 'Processing...' : 'Done Payment'}
               </button>
-              <button onClick={() => setView('checkout')} style={{ marginLeft: 10 }}>Cancel</button>
+              <button onClick={() => setView('checkout')} style={{ marginLeft: 10 }} disabled={paymentExpired}>Cancel</button>
             </div>
           </div>
         </div>
@@ -472,7 +518,11 @@ function App() {
           <h2>Payment Successful</h2>
           <p style={{ fontWeight: 'bold' }}>Your payment was successful. Thank you for your order.</p>
           <div style={{ marginTop: 20 }}>
-            <button onClick={() => { setView('products'); setOrderMessage(null); }} className="btn-primary">Continue Shopping</button>
+            <button onClick={async () => { 
+              await fetchProducts();
+              setView('products'); 
+              setOrderMessage(null); 
+            }} className="btn-primary">Continue Shopping</button>
           </div>
         </div>
       )}

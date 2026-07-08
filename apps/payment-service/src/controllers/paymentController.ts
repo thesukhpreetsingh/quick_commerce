@@ -24,3 +24,38 @@ export const handlePayment = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * @openapi
+ * /api/payments:
+ *   post:
+ *     summary: Process a payment for an order
+ *     tags: [Payments]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [orderId, amount, currency]
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *               amount:
+ *                 type: number
+ *               currency:
+ *                 type: string
+ *               customerName:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Payment processed successfully
+ *       402:
+ *         description: Payment declined
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Internal server error
+ */

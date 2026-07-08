@@ -3,11 +3,11 @@ dotenv.config()
 import express from 'express';
 import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
-import { seedDatabase } from './services/seedService';
-import { connectRedis } from './services/cacheService';
-import productRoutes from './routes/productRoutes';
-import { logger, requestLogger, errorLogger } from './config/logger';
-import { swaggerSpec } from './config/swagger';
+import { seedDatabase } from './services/seedService.js';
+import { connectRedis } from './services/cacheService.js';
+import productRoutes from './routes/productRoutes.js';
+import { logger, requestLogger, errorLogger } from './config/logger.js';
+import { swaggerSpec } from './config/swagger.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;

@@ -290,6 +290,27 @@ body {
   transform: scale(1.02);
 }
 
+/* Disabled button styling: make unclickable, gray, and show not-allowed cursor */
+.btn-success:disabled {
+  background: #9ca3af;
+  color: #ffffff;
+  cursor: not-allowed;
+  opacity: 0.85;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-success:disabled:hover {
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Global disabled button fallback */
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
 /* Cleaned App.css — valid CSS */
 :root {
   --primary-color: #facc15;

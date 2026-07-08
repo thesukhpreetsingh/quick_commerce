@@ -27,6 +27,28 @@ export const fetchInventory = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * @openapi
+ * /api/inventory/{id}:
+ *   get:
+ *     summary: Fetch inventory for a product
+ *     tags: [Inventory]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: integer
+ *         required: true
+ *         description: Product id
+ *     responses:
+ *       200:
+ *         description: Inventory returned
+ *       404:
+ *         description: Product not found
+ *       500:
+ *         description: Internal server error
+ */
+
 export const decreaseInventoryHandler = async (req: Request<{}, {}, InventoryRequest>, res: Response) => {
   try {
     const items = req.body.items;
@@ -45,6 +67,37 @@ export const decreaseInventoryHandler = async (req: Request<{}, {}, InventoryReq
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
+
+/**
+ * @openapi
+ * /api/inventory/decrease:
+ *   post:
+ *     summary: Decrease inventory for items
+ *     tags: [Inventory]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     productId:
+ *                       type: integer
+ *                     quantity:
+ *                       type: integer
+ *     responses:
+ *       200:
+ *         description: Inventory decreased
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Internal server error
+ */
 
 export const reserveInventoryHandler = async (req: Request<{}, {}, ReservationRequest>, res: Response) => {
   try {
@@ -65,6 +118,40 @@ export const reserveInventoryHandler = async (req: Request<{}, {}, ReservationRe
   }
 };
 
+/**
+ * @openapi
+ * /api/inventory/reserve:
+ *   post:
+ *     summary: Reserve inventory for an order
+ *     tags: [Inventory]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [orderId, items]
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *               items:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     productId:
+ *                       type: integer
+ *                     quantity:
+ *                       type: integer
+ *     responses:
+ *       200:
+ *         description: Inventory reserved
+ *       400:
+ *         description: Bad request / insufficient stock
+ *       500:
+ *         description: Internal server error
+ */
+
 export const releaseInventoryHandler = async (req: Request<{}, {}, ReservationActionRequest>, res: Response) => {
   try {
     const { orderId } = req.body;
@@ -78,6 +165,30 @@ export const releaseInventoryHandler = async (req: Request<{}, {}, ReservationAc
   }
 };
 
+/**
+ * @openapi
+ * /api/inventory/release:
+ *   post:
+ *     summary: Release reserved inventory for an order
+ *     tags: [Inventory]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Reservation released
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Internal server error
+ */
+
 export const finalizeInventoryHandler = async (req: Request<{}, {}, ReservationActionRequest>, res: Response) => {
   try {
     const { orderId } = req.body;
@@ -90,3 +201,27 @@ export const finalizeInventoryHandler = async (req: Request<{}, {}, ReservationA
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
+
+/**
+ * @openapi
+ * /api/inventory/finalize:
+ *   post:
+ *     summary: Finalize a reservation (commit inventory to order)
+ *     tags: [Inventory]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               orderId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Reservation finalized
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Internal server error
+ */

@@ -64,3 +64,24 @@ The system follows an event-driven architecture to ensure consistency and decoup
 - **Database**: PostgreSQL (Relational data), Redis (Caching & Message Queue)
 - **Communication**: REST API, gRPC (Internal), BullMQ (Eventing)
 - **Infrastructure**: Docker, Docker Compose, Nginx
+
+## 🆕 Recent Updates (2026-07-08)
+
+- OpenAPI/JSDoc annotations were added to many controller files so endpoint documentation appears in each service's Swagger UI.
+- Frontend payment flow: a 60s payment timeout now disables the `Done Payment` action and triggers a 10s redirect to the storefront; this matches the server-side timeout job that cancels unpaid orders.
+- Inventory caching and Lua script: fixed a Lua script bug that caused runtime errors when updating cached numeric stock values.
+
+## Developer: Rebuild & Verify
+
+After pulling changes, rebuild the affected services so `swagger-jsdoc` and runtime code reflect the updates:
+
+```bash
+docker compose up -d --build backend order-service inventory-service payment-service frontend
+```
+
+Then open the service docs (see URLs above) to confirm endpoints and schemas appear.
+
+## Troubleshooting notes
+
+- If TypeScript ESM import errors occur ("Relative import paths need explicit file extensions"), update server-side imports to include the `.js` extension for runtime files compiled to ESM (e.g., `import foo from '../config/db.js'`).
+

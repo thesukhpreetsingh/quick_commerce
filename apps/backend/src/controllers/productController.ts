@@ -21,6 +21,18 @@ export const getProducts = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * @openapi
+ * /api/products:
+ *   get:
+ *     summary: Get all products
+ *     tags: [Products]
+ *     responses:
+ *       200:
+ *         description: List of products
+ *       500:
+ *         description: Internal server error
+ */
 export const getProductById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
@@ -43,3 +55,25 @@ export const getProductById = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 };
+
+/**
+ * @openapi
+ * /api/products/{id}:
+ *   get:
+ *     summary: Get a product by external id
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: External product id
+ *     responses:
+ *       200:
+ *         description: Product returned
+ *       404:
+ *         description: Product not found
+ *       500:
+ *         description: Internal server error
+ */

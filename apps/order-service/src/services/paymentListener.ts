@@ -39,6 +39,7 @@ const worker = new Worker(
         await redisClient.del(`product:${productId}`);
         await redisClient.del(`inventory:product:${productId}`);
       }
+      await redisClient.del('all_products');
 
       console.log(`Order ${data.orderId} marked PAID and affected product caches invalidated`);
 

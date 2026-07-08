@@ -130,14 +130,9 @@ const updateProductListLua = `
   for i=1,#KEYS do
     local key = KEYS[i]
     local newStock = ARGV[i]
-    local productData = redis.call('GET', key)
-    if productData then
-      local decoded = cjson.decode(productData)
-      decoded.stock = tonumber(newStock)
-      redis.call('SET', key, cjson.encode(decoded))
-    end
+    redis.call('SET', key, newStock)
   end
-  
+
   redis.call('DEL', 'all_products')
   return true
 `;

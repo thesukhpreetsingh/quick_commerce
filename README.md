@@ -76,7 +76,7 @@ The system follows an event-driven architecture to ensure consistency and decoup
 After pulling changes, rebuild the affected services so `swagger-jsdoc` and runtime code reflect the updates:
 
 ```bash
-docker compose up -d --build backend order-service inventory-service payment-service frontend
+docker compose up -d --build
 ```
 
 Then open the service docs (see URLs above) to confirm endpoints and schemas appear.

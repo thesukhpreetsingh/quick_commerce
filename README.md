@@ -85,3 +85,13 @@ Then open the service docs (see URLs above) to confirm endpoints and schemas app
 
 - If TypeScript ESM import errors occur ("Relative import paths need explicit file extensions"), update server-side imports to include the `.js` extension for runtime files compiled to ESM (e.g., `import foo from '../config/db.js'`).
 
+
+## IMPORTANT NOTE
+### rename .enf.prod to .env and (in /apps/notification-service)
+
+paste 
+```
+TWILIO_ACCOUNT_SID = your sid
+TWILIO_AUTH_TOKEN = auth token
+TWILIO_FROM_NUM = your sandbox or main number
+```

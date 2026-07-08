@@ -1,9 +1,7 @@
 import { Router } from 'express';
 import { placeOrder } from '../controllers/orderController.js';
 import { orderQueue } from '../services/orderQueue.js';
-
 const router = Router();
-
 /**
  * @openapi
  * /api/orders:
@@ -52,7 +50,6 @@ const router = Router();
  *         description: Internal server error
  */
 router.post('/', placeOrder);
-
 /**
  * @openapi
  * /api/orders/queue:
@@ -64,13 +61,13 @@ router.post('/', placeOrder);
  *         description: Queue counts returned successfully
  */
 router.get('/queue', async (req, res) => {
-  try {
-    const counts = await orderQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed', 'paused');
-    res.json({ success: true, queue: counts });
-  } catch (error: any) {
-    console.error('Queue status error:', error);
-    res.status(500).json({ success: false, error: 'Unable to read queue status' });
-  }
+    try {
+        const counts = await orderQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed', 'paused');
+        res.json({ success: true, queue: counts });
+    }
+    catch (error) {
+        console.error('Queue status error:', error);
+        res.status(500).json({ success: false, error: 'Unable to read queue status' });
+    }
 });
-
 export default router;

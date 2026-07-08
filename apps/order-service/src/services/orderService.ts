@@ -4,6 +4,7 @@ import https from 'https';
 import { dbPool, query } from '../config/db.js';
 import { redisClient } from '../config/redis.js';
 import { enqueueOrder } from './orderQueue.js';
+import { enqueueNotification } from './notificationQueue.js';
 
 type OrderItem = {
   productId: number;
@@ -88,6 +89,15 @@ async function persistOrder(orderId: string, orderData: OrderPayload, totalAmoun
   }
 }
 
+async function sendOrderCreatedNotification(orderId: string, phone: string) {
+  await enqueueNotification({
+    type: 'ORDER_CREATED',
+    orderId,
+    customerPhone: phone,
+    message: `Your order ${orderId} has been placed successfully and is awaiting payment!`
+  }).catch(e => console.error('Notification enqueue failed:', e));
+}
+
 async function updateOrderStatus(orderId: string, status: string) {
   await query('UPDATE orders SET status = $1 WHERE id = $2', [status, orderId]);
 }
@@ -116,6 +126,9 @@ export async function createOrder(orderData: OrderPayload) {
   const totalAmount = orderData.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   const orderRecord = await persistOrder(orderId, orderData, totalAmount, createdAt);
+
+  // Send Order Created Notification
+  await sendOrderCreatedNotification(orderId, orderData.phone);
 
   try {
     await reserveInventory(orderId, orderData.items);

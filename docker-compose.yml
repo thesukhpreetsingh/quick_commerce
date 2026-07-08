@@ -34,15 +34,15 @@ services:
     restart: always
     ports:
       - "5000:5000"
-    environment:
-      DB_HOST: postgres-db
-      DB_USER: user
-      DB_PASSWORD: password
-      DB_NAME: marketplace
-      DB_PORT: 5432
-      PORT: 5000
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+    # environment:
+      # DB_HOST: postgres-db
+      # DB_USER: user
+      # DB_PASSWORD: password
+      # DB_NAME: marketplace
+      # DB_PORT: 5432
+      # PORT: 5000
+      # REDIS_HOST: redis
+      # REDIS_PORT: 6379
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -60,15 +60,15 @@ services:
     restart: always
     ports:
       - "6001:6000"
-    environment:
-      DB_HOST: postgres-db
-      DB_USER: user
-      DB_PASSWORD: password
-      DB_NAME: marketplace
-      DB_PORT: 5432
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      INVENTORY_SERVICE_GRPC_URL: inventory-service:7001
+    # environment:
+    #   DB_HOST: postgres-db
+    #   DB_USER: user
+    #   DB_PASSWORD: password
+    #   DB_NAME: marketplace
+    #   DB_PORT: 5432
+    #   REDIS_HOST: redis
+    #   REDIS_PORT: 6379
+    #   INVENTORY_SERVICE_GRPC_URL: inventory-service:7001
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -125,6 +125,17 @@ services:
       - backend
       - order-service
 
+  notification-service:
+    build:
+      context: ./apps/notification-service
+      dockerfile: Dockerfile
+    container_name: marketplace-notification-service
+    restart: "no"
+    ports:
+      - "6002:6002"
+    depends_on:
+      - redis
+
   pgadmin:
     image: dpage/pgadmin4
     container_name: pgadmin
@@ -136,8 +147,8 @@ services:
     depends_on:
       - postgres-db
 
+
 volumes:
   postgres_data:
   redis_data:
   bullmq_data:
-

@@ -1,0 +1,14 @@
+# redis
+REDIS_HOST =localhost
+REDIS_PORT = 6379
+
+# twilio creds
+TWILIO_ACCOUNT_SID = your account SID
+TWILIO_AUTH_TOKEN = your token
+TWILIO_FROM_NUM = whats app number -from-  twilio
+
+# redis
+REDIS_HOST =localhost
+REDIS_PORT = 6379
+
+PORT = 6002

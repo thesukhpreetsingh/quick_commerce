@@ -6,6 +6,8 @@ const connection = {
 };
 
 export const queueName = process.env.ORDER_QUEUE_NAME || 'order-queue';
+export const toQueueName = process.env.ORDER_TIMEOUT_QUEUE_NAME || 'payment-timeouts';
+
 
 export const orderQueue = new Queue(queueName, {
   connection,

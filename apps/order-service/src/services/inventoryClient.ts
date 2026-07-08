@@ -1,7 +1,7 @@
 import http from 'http';
 import https from 'https';
 
-const inventoryUrl = process.env.INVENTORY_SERVICE_URL || 'http://inventory-service:7000';
+const inventoryUrl = process.env.INVENTORY_SERVICE_URL;
 
 function request(path: string, method: string, payload: any) {
   const url = new URL(path, inventoryUrl);

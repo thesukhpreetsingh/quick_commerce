@@ -17,6 +17,27 @@ Below are the available services and their access points when running via Docker
 
 ---
 
+## 📚 API Documentation
+
+All services expose Swagger UI when the stack is running:
+
+- Backend API: http://localhost:5000/api/docs
+- Order Service: http://localhost:6001/api/docs
+- Payment Service: http://localhost:5002/api/docs
+- Inventory Service: http://localhost:7000/api/docs
+
+The frontend also includes a Docs button in the header that opens the Swagger docs for each service.
+
+## 🧹 Full Docker Cleanup
+
+To stop all containers, remove volumes, and delete all related images for a complete reset:
+
+```bash
+docker compose down --volumes --rmi all
+```
+
+Use this when you want a clean slate for Docker-based development.
+
 ## ⚙️ System Workflow
 
 The system follows an event-driven architecture to ensure consistency and decoupling between services.

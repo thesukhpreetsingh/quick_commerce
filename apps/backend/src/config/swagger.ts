@@ -1,4 +1,7 @@
+import path from 'path';
 import swaggerJsdoc from 'swagger-jsdoc';
+
+const rootDir = path.resolve(__dirname, '..');
 
 export const swaggerSpec = swaggerJsdoc({
   definition: {
@@ -8,6 +11,7 @@ export const swaggerSpec = swaggerJsdoc({
       version: '1.0.0',
       description: 'Product API for the backend service',
     },
+    servers: [{ url: '/' }],
   },
-  apis: ['./src/routes/*.ts'],
+  apis: [path.join(rootDir, 'routes/*.ts'), path.join(rootDir, 'routes/*.js')],
 });

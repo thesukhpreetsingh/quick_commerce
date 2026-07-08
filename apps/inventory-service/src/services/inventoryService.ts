@@ -34,6 +34,70 @@ export async function getInventory(productId: number) {
   return stock === null ? null : { stock };
 }
 
+export async function getBulkInventory(productIds: number[]) {
+  const keys = productIds.map(id => inventoryKey(id));
+  const cachedValues = await redisClient.mGet(keys);
+  
+  const results: Record<number, number | null> = {};
+  const missingIds: number[] = [];
+
+  productIds.forEach((id, index) => {
+    const val = cachedValues[index];
+    if (val !== null) {
+      results[id] = Number(val);
+    } else {
+      missingIds.push(id);
+    }
+  });
+
+  if (missingIds.length > 0) {
+    const mutexKey = 'lock:inventory:recompute';
+    let acquired = false;
+    
+    // Mutex Lock on Cache-Miss to prevent Thundering Herd
+    while (!acquired) {
+      acquired = !!(await redisClient.set(mutexKey, 'locked', {
+        NX: true,
+        PX: 2000 // 2 second TTL
+      }));
+
+      if (acquired) {
+        // This request is the "Chosen One" - fetch from DB and populate cache
+        const pipeline = redisClient.multi();
+        for (const id of missingIds) {
+          const row = await getStockFromDb(id);
+          if (row) {
+            results[id] = row.stock;
+            pipeline.set(inventoryKey(id), String(row.stock));
+          } else {
+            results[id] = null;
+          }
+        }
+        await pipeline.exec();
+        break;
+      } else {
+        // Wait and retry
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Re-check if the cache was populated by the other request
+        const recheckValues = await redisClient.mGet(keys);
+        const missingStill = recheckValues.filter(v => v === null).length;
+        
+        // If the number of missing items decreased, the other request is making progress
+        // We return the current state of the cache to avoid infinite waiting
+        if (missingStill < missingIds.length) {
+          productIds.forEach((id, index) => {
+            results[id] = recheckValues[index] !== null ? Number(recheckValues[index]) : null;
+          });
+          return results;
+        }
+      }
+    }
+  }
+
+  return results;
+}
+
 const inventoryDecrementLua = `
   for i=1,#KEYS do
     local current = tonumber(redis.call('GET', KEYS[i]) or '-1')
@@ -50,6 +114,32 @@ const inventoryDecrementLua = `
     table.insert(results, tostring(newValue))
   end
   return results
+`;
+
+const finalizePurchaseLua = `
+  for i=1,#KEYS do
+    local key = KEYS[i]
+    local amount = tonumber(ARGV[i])
+    redis.call('DECRBY', key, amount)
+  end
+  redis.call('DEL', 'all_products')
+  return true
+`;
+
+const updateProductListLua = `
+  for i=1,#KEYS do
+    local key = KEYS[i]
+    local newStock = ARGV[i]
+    local productData = redis.call('GET', key)
+    if productData then
+      local decoded = cjson.decode(productData)
+      decoded.stock = tonumber(newStock)
+      redis.call('SET', key, cjson.encode(decoded))
+    end
+  end
+  
+  redis.call('DEL', 'all_products')
+  return true
 `;
 
 export async function decreaseInventory(items: InventoryUpdate[]) {
@@ -73,14 +163,43 @@ export async function decreaseInventory(items: InventoryUpdate[]) {
   }
 
   const updated: any[] = [];
-  for (const item of items) {
-    const queryResult = await query(
-      'UPDATE products SET stock = GREATEST(stock - $1, 0) WHERE external_id = $2 RETURNING *',
-      [item.quantity, item.productId]
-    );
-    if (queryResult.rows.length > 0) {
-      updated.push(queryResult.rows[0]);
+  
+  // Granular Locking: Sort IDs to prevent deadlocks
+  const sortedItems = [...items].sort((a, b) => a.productId - b.productId);
+  const acquiredLocks: string[] = [];
+
+  try {
+    for (const item of sortedItems) {
+      const lockKey = `lock:product:${item.productId}`;
+      const lockAcquired = await redisClient.set(lockKey, 'locked', {
+        NX: true,
+        PX: 5000
+      });
+
+      if (!lockAcquired) {
+        throw new Error(`Product ${item.productId} is currently being updated, please try again`);
+      }
+      acquiredLocks.push(lockKey);
     }
+
+    for (const item of items) {
+      const queryResult = await query(
+        'UPDATE products SET stock = GREATEST(stock - $1, 0) WHERE external_id = $2 RETURNING *',
+        [item.quantity, item.productId]
+      );
+      if (queryResult.rows.length > 0) {
+        updated.push(queryResult.rows[0]);
+      }
+    }
+
+    // Use LUA to atomically update the cache to absolute DB values and invalidate the global list
+    const updateKeys = updated.map(p => inventoryKey(p.external_id));
+    const updateArgs = updated.map(p => String(p.stock));
+    await redisClient.eval(updateProductListLua, { keys: updateKeys, arguments: updateArgs });
+
+  } finally {
+    // Release all acquired locks
+    await Promise.all(acquiredLocks.map(key => redisClient.del(key)));
   }
 
   return updated;
@@ -129,15 +248,17 @@ export async function releaseInventory(orderId: string) {
   }
 
   const released: Array<{ productId: number; quantity: number }> = [];
+  const pipeline = redisClient.multi();
   for (const [productId, quantity] of Object.entries(reserved)) {
     const qty = Number(quantity);
     if (qty <= 0) continue;
 
-    await redisClient.incrBy(inventoryKey(Number(productId)), qty);
+    pipeline.incrBy(inventoryKey(Number(productId)), qty);
     released.push({ productId: Number(productId), quantity: qty });
   }
 
-  await redisClient.del(key);
+  pipeline.del(key);
+  await pipeline.exec();
   return { orderId, released };
 }
 
@@ -149,14 +270,31 @@ export async function finalizeReservation(orderId: string) {
   }
 
   const finalized: Array<{ productId: number; quantity: number }> = [];
+  const pipeline = redisClient.multi();
+  const updatedStocks: {id: number, stock: number}[] = [];
+
   for (const [productId, quantity] of Object.entries(reserved)) {
     const qty = Number(quantity);
     if (qty <= 0) continue;
 
-    await query('UPDATE products SET stock = GREATEST(stock - $1, 0) WHERE external_id = $2 RETURNING *', [qty, Number(productId)]);
+    const queryResult = await query('UPDATE products SET stock = GREATEST(stock - $1, 0) WHERE external_id = $2 RETURNING *', [qty, Number(productId)]);
+    if (queryResult.rows.length > 0) {
+      const stock = queryResult.rows[0].stock;
+      pipeline.set(inventoryKey(Number(productId)), String(stock));
+      updatedStocks.push({id: Number(productId), stock});
+    }
     finalized.push({ productId: Number(productId), quantity: qty });
   }
 
-  await redisClient.del(key);
+  pipeline.del(key);
+  await pipeline.exec();
+
+  // Update the global product list cache atomically using LUA
+  if (updatedStocks.length > 0) {
+    const updateKeys = updatedStocks.map(s => inventoryKey(s.id));
+    const updateArgs = updatedStocks.map(s => String(s.stock));
+    await redisClient.eval(updateProductListLua, { keys: updateKeys, arguments: updateArgs });
+  }
+
   return { orderId, finalized };
 }

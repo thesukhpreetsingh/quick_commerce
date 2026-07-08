@@ -1,14 +1,13 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import swaggerUi from 'swagger-ui-express';
 import { connectRedis, pingRedis } from './config/redis.js';
 import { dbPool } from './config/db.js';
 import inventoryRoutes from './routes/inventoryRoutes.js';
 import { logger, requestLogger, errorLogger } from './config/logger.js';
 import { swaggerSpec } from './config/swagger.js';
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 7000;

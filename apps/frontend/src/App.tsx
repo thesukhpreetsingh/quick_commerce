@@ -6,6 +6,14 @@ import { ProductCard } from './components/ProductCard'
 const ORDER_SERVICE_URL = import.meta.env.VITE_ORDER_SERVICE_URL || 'http://localhost:6001'
 const PRODUCT_SERVICE_URL = import.meta.env.VITE_PRODUCT_SERVICE_URL || 'http://localhost:5000'
 const PAYMENT_SERVICE_URL = import.meta.env.VITE_PAYMENT_SERVICE_URL || 'http://localhost:5002'
+const INVENTORY_SERVICE_URL = import.meta.env.VITE_INVENTORY_SERVICE_URL || 'http://localhost:7000'
+
+const serviceDocs = [
+  { label: 'Backend API', url: `${PRODUCT_SERVICE_URL}/api/docs` },
+  { label: 'Order Service', url: `${ORDER_SERVICE_URL}/api/docs` },
+  { label: 'Payment Service', url: `${PAYMENT_SERVICE_URL}/api/docs` },
+  { label: 'Inventory Service', url: `${INVENTORY_SERVICE_URL}/api/docs` },
+]
 
 interface Product {
 // ...existing code...
@@ -39,6 +47,7 @@ function App() {
   const [paymentTimeLeft, setPaymentTimeLeft] = useState(60);
   const [orderServiceUp, setOrderServiceUp] = useState(true);
   const [healthLoading, setHealthLoading] = useState(true);
+  const [showDocsMenu, setShowDocsMenu] = useState(false);
 
   useEffect(() => {
     // Clear any previous order message when opening checkout
@@ -148,17 +157,35 @@ function App() {
     <div className="app-container">
       <header className="header">
         <h1>QuickCommerce</h1>
-        <nav className="nav-buttons">
+        <nav className="nav-buttons" style={{ position: 'relative' }}>
           <button onClick={() => setView('products')}>Products</button>
           <button onClick={() => setView('cart')} className="cart-btn">
             Cart ({cart.filter(item => item.quantity > 0).length})
           </button>
-          <button
-            onClick={() => window.open(`${ORDER_SERVICE_URL}/api/docs`, '_blank', 'noopener')}
-            title="Open API documentation"
-          >
-            Docs
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowDocsMenu(prev => !prev)}
+              title="Open API documentation"
+            >
+              Docs
+            </button>
+            {showDocsMenu && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, background: '#fff', border: '1px solid #ddd', borderRadius: '8px', boxShadow: '0 6px 16px rgba(0,0,0,0.12)', padding: '8px', display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '180px', zIndex: 20 }}>
+                {serviceDocs.map((doc) => (
+                  <button
+                    key={doc.label}
+                    onClick={() => {
+                      window.open(doc.url, '_blank', 'noopener');
+                      setShowDocsMenu(false);
+                    }}
+                    style={{ textAlign: 'left', padding: '6px 8px', border: 'none', background: 'transparent', cursor: 'pointer' }}
+                  >
+                    {doc.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button 
             onClick={() => setCurrency(prev => prev === 'INR' ? 'USD' : 'INR')}
             title={`Switch to ${currency === 'INR' ? 'USD' : 'INR'}`}
